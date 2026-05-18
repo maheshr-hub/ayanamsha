@@ -1,0 +1,23 @@
+{
+  "name": "ayanamsha",
+  "version": "1.0.0",
+  "description": "A focused Vedic astronomy sky map showing Rāśi, Nakṣatra, Lagna and planet positions",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "deploy": "npm run build && gh-pages -d dist"
+  },
+  "dependencies": {
+    "astronomy-engine": "^2.1.19",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "gh-pages": "^6.2.0",
+    "vite": "^6.0.7",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}
