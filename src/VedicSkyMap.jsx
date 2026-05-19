@@ -607,7 +607,7 @@ export default function Ayanamsha() {
         </div>
 
         <div style={{ marginTop: 12, fontSize: 10, color: '#5a5040', textAlign: 'center', letterSpacing: '0.05em' }}>
-          Planet positions via astronomy-engine VSOP87 (~1 arcmin) · Mean lunar node shown (true node needs Swiss Ephemeris)
+          Planet positions via astronomy-engine VSOP87 (~1 arcmin) · Mean lunar node · © 2026 Mahesh Ramanan, MIT
           · ℞ = retrograde
         </div>
       </div>
