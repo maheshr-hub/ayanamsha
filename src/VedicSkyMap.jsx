@@ -183,12 +183,143 @@ const PLANETS = [
 ];
 
 // =============================================================================
+// PAÑCĀṄGA REFERENCE DATA
+// =============================================================================
+
+// Tithi names (1-15 = śukla pakṣa, 16-29 = kṛṣṇa pakṣa, 30 = Amāvāsyā)
+const TITHI_NAMES = [
+  'Pratipadā', 'Dvitīyā', 'Tṛtīyā', 'Caturthī', 'Pañcamī',
+  'Ṣaṣṭhī', 'Saptamī', 'Aṣṭamī', 'Navamī', 'Daśamī',
+  'Ekādaśī', 'Dvādaśī', 'Trayodaśī', 'Caturdaśī', 'Pūrṇimā',
+  'Pratipadā', 'Dvitīyā', 'Tṛtīyā', 'Caturthī', 'Pañcamī',
+  'Ṣaṣṭhī', 'Saptamī', 'Aṣṭamī', 'Navamī', 'Daśamī',
+  'Ekādaśī', 'Dvādaśī', 'Trayodaśī', 'Caturdaśī', 'Amāvāsyā',
+];
+
+// 27 yogas (Sun + Moon longitudes, divided into 27 parts)
+const YOGA_NAMES = [
+  'Viṣkambha', 'Prīti', 'Āyuṣmān', 'Saubhāgya', 'Śobhana',
+  'Atigaṇḍa', 'Sukarmā', 'Dhṛti', 'Śūla', 'Gaṇḍa',
+  'Vṛddhi', 'Dhruva', 'Vyāghāta', 'Harṣaṇa', 'Vajra',
+  'Siddhi', 'Vyatīpāta', 'Variyāna', 'Parigha', 'Śiva',
+  'Siddha', 'Sādhya', 'Śubha', 'Śukla', 'Brahmā',
+  'Indra', 'Vaidhṛti',
+];
+
+// Traditional classification of yogas as auspicious or inauspicious for muhūrta.
+// The 9 'aśubha' yogas are: Viṣkambha, Atigaṇḍa, Śūla, Gaṇḍa, Vyāghāta, Vajra, Vyatīpāta, Parigha, Vaidhṛti.
+const YOGA_QUALITY = {
+  'Viṣkambha': 'aśubha (avoid)',
+  'Prīti': 'śubha',
+  'Āyuṣmān': 'śubha',
+  'Saubhāgya': 'śubha',
+  'Śobhana': 'śubha',
+  'Atigaṇḍa': 'aśubha (avoid)',
+  'Sukarmā': 'śubha',
+  'Dhṛti': 'śubha',
+  'Śūla': 'aśubha (avoid)',
+  'Gaṇḍa': 'aśubha (avoid)',
+  'Vṛddhi': 'śubha',
+  'Dhruva': 'śubha',
+  'Vyāghāta': 'aśubha (avoid)',
+  'Harṣaṇa': 'śubha',
+  'Vajra': 'aśubha (avoid)',
+  'Siddhi': 'śubha',
+  'Vyatīpāta': 'aśubha (avoid)',
+  'Variyāna': 'śubha',
+  'Parigha': 'aśubha (avoid)',
+  'Śiva': 'śubha',
+  'Siddha': 'śubha',
+  'Sādhya': 'śubha',
+  'Śubha': 'śubha',
+  'Śukla': 'śubha',
+  'Brahmā': 'śubha',
+  'Indra': 'śubha',
+  'Vaidhṛti': 'aśubha (avoid)',
+};
+
+// Karaṇa: 60 half-tithis per lunar month.
+// Positions 1, 58, 59, 60 are the 4 fixed (sthira) karaṇas around Amāvāsyā.
+// Positions 2-57 cycle through 7 movable (cara) karaṇas, 8 times.
+const MOVABLE_KARANAS = ['Bava', 'Bālava', 'Kaulava', 'Taitila', 'Garaja', 'Vaṇija', 'Viṣṭi'];
+// Viṣṭi karaṇa is also known as Bhadrā - traditionally inauspicious
+const FIXED_KARANAS = {
+  58: 'Śakuni',
+  59: 'Catuṣpāda',
+  60: 'Nāga',
+  1: 'Kiṃstughna',
+};
+
+function getKaranaName(position) {
+  // position is 1..60 within the lunar month
+  if (FIXED_KARANAS[position]) return FIXED_KARANAS[position];
+  // Movable karaṇas occupy positions 2..57
+  // Position 2 -> Bava (idx 0), position 3 -> Bālava (idx 1), ...
+  const idx = (position - 2) % 7;
+  return MOVABLE_KARANAS[idx];
+}
+
+// Vāra (weekday) - traditional ordering starting Sunday with Sūrya
+const VARAS = ['Ravivāra', 'Somavāra', 'Maṅgalavāra', 'Budhavāra', 'Guruvāra', 'Śukravāra', 'Śanivāra'];
+const VARA_PLANET = ['Sūrya', 'Candra', 'Maṅgala', 'Budha', 'Guru', 'Śukra', 'Śani'];
+
+// Compute pañcāṅga elements from sidereal sun and moon longitudes
+function computePanchanga(sunSidLon, moonSidLon, date) {
+  // Tithi: Moon - Sun, in 12° units
+  const elongation = ((moonSidLon - sunSidLon) + 360) % 360;
+  const tithiNumber = Math.floor(elongation / 12) + 1; // 1..30
+  const tithiProgress = (elongation % 12) / 12; // 0..1 within current tithi
+  const paksha = tithiNumber <= 15 ? 'Śukla' : 'Kṛṣṇa';
+  const tithiName = TITHI_NAMES[tithiNumber - 1];
+
+  // Yoga: Sun + Moon, in (360/27) units
+  const yogaSum = (sunSidLon + moonSidLon) % 360;
+  const yogaSpan = 360 / 27;
+  const yogaNumber = Math.floor(yogaSum / yogaSpan) + 1;
+  const yogaName = YOGA_NAMES[yogaNumber - 1];
+
+  // Karaṇa: half-tithi
+  const karanaPosition = Math.floor(elongation / 6) + 1; // 1..60
+  const karanaName = getKaranaName(karanaPosition);
+  // Which half of the tithi we're in (0 = first half, 1 = second half)
+  const karanaHalf = Math.floor((elongation % 12) / 6);
+
+  // Vāra (weekday). JS getDay(): 0=Sunday
+  const varaIdx = date.getDay();
+  const varaName = VARAS[varaIdx];
+  const varaPlanet = VARA_PLANET[varaIdx];
+
+  return {
+    elongation,
+    tithi: {
+      number: tithiNumber,
+      name: tithiName,
+      paksha,
+      progress: tithiProgress,
+    },
+    yoga: {
+      number: yogaNumber,
+      name: yogaName,
+    },
+    karana: {
+      position: karanaPosition,
+      name: karanaName,
+      half: karanaHalf, // 0 = first half of tithi, 1 = second half
+    },
+    vara: {
+      number: varaIdx,
+      name: varaName,
+      planet: varaPlanet,
+    },
+  };
+}
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
-export default function Ayanamsha() {
+export default function VedicSkyMap() {
   const [now, setNow] = useState(new Date());
-  const [live, setLive] = useState(true);
   const [lat, setLat] = useState(-27.4698);
   const [lon, setLon] = useState(153.0251);
   const [locName, setLocName] = useState('Brisbane');
@@ -198,10 +329,34 @@ export default function Ayanamsha() {
   const [showPada, setShowPada] = useState(false);
   const [showStars, setShowStars] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
+  const [showTithiArc, setShowTithiArc] = useState(true);
+  // Label size: 'small', 'medium' (default), 'large'. Persisted to localStorage.
+  const [labelSize, setLabelSize] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('ayanamsha-label-size') || 'medium';
+    }
+    return 'medium';
+  });
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('ayanamsha-label-size', labelSize);
+    }
+  }, [labelSize]);
   const [selected, setSelected] = useState(null);
   const [size, setSize] = useState(640);
 
+  // Animation state. speedMultiplier = how fast simulated time advances vs real time.
+  // 1 = real-time live mode. 1440 = "1 day per minute" (Lagna sweep). Etc.
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [playing, setPlaying] = useState(true); // true at speed=1 means live; at speeds > 1 means animating
+  const [showTrails, setShowTrails] = useState(false);
+
+  // Trails: rolling buffer of recent planet positions (sky-coords) for each planet
+  const trailsRef = useRef({}); // { Mars: [{x,y}, ...], ... }
+
   const containerRef = useRef(null);
+  const rafRef = useRef(null);
+  const lastFrameTimeRef = useRef(null);
 
   useEffect(() => {
     function updateSize() {
@@ -215,11 +370,44 @@ export default function Ayanamsha() {
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
+  // Location search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const searchTimerRef = useRef(null);
+
+  // Animation loop. Uses requestAnimationFrame for smooth motion at any speed.
+  // At speedMultiplier=1 with playing=true, this is equivalent to "live" mode.
+  // At higher speeds, simulated time advances faster: simulated_dt = real_dt * speedMultiplier.
   useEffect(() => {
-    if (!live) return;
-    const t = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(t);
-  }, [live]);
+    if (!playing) {
+      lastFrameTimeRef.current = null;
+      return;
+    }
+
+    function tick(timestamp) {
+      if (lastFrameTimeRef.current == null) {
+        lastFrameTimeRef.current = timestamp;
+      }
+      const realDtMs = timestamp - lastFrameTimeRef.current;
+      lastFrameTimeRef.current = timestamp;
+
+      if (speedMultiplier === 1) {
+        // Live mode: snap to wall clock so display stays accurate
+        setNow(new Date());
+      } else {
+        // Animation mode: advance simulated time at speedMultiplier × real time
+        setNow(prev => new Date(prev.getTime() + realDtMs * speedMultiplier));
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      lastFrameTimeRef.current = null;
+    };
+  }, [playing, speedMultiplier]);
 
   const sky = useMemo(() => {
     const jd = dateToJD(now);
@@ -307,11 +495,51 @@ export default function Ayanamsha() {
       padaBounds.push({ sidLon: sidL, p: projectStereographic(hor.alt, hor.az) });
     }
 
+    // Pañcāṅga - compute from Sun and Moon sidereal longitudes
+    const sunPlanet = planets.find(p => p.key === 'Sun');
+    const moonPlanet = planets.find(p => p.key === 'Moon');
+    const panchanga = computePanchanga(sunPlanet.sidLon, moonPlanet.sidLon, now);
+
+    // Tithi arc: sample the ecliptic from Sun's tropical longitude to Moon's tropical longitude
+    // going eastward (in the direction Moon is moving away from Sun).
+    // Note: we use tropical for projection (since star coords are tropical-of-date too).
+    const sunTrop = sunPlanet.tropLon;
+    const moonTrop = moonPlanet.tropLon;
+    let arcSpan = ((moonTrop - sunTrop) + 360) % 360; // 0..360, the elongation in tropical
+    // Sample arc points at 2° intervals along the ecliptic from Sun to Moon
+    const tithiArc = [];
+    if (arcSpan > 0.5) {
+      const steps = Math.max(2, Math.ceil(arcSpan / 2));
+      for (let i = 0; i <= steps; i++) {
+        const l = (sunTrop + (arcSpan * i / steps)) % 360;
+        const eq2 = eclToEq(l, 0, eps);
+        const hor = eqToHor(eq2.ra, eq2.dec, lat, lst);
+        tithiArc.push({ tropLon: l, p: projectStereographic(hor.alt, hor.az) });
+      }
+    }
+    // Karaṇa notch: the half-tithi boundary closest to the Moon.
+    // This is where the karaṇa changes within the current tithi (each tithi has 2 karaṇas).
+    // Tithi runs from tithiStartElong to tithiStartElong + 12°. Karaṇa boundary sits at +6°.
+    // We always show this boundary; it may sit ahead of the Moon (first half of tithi)
+    // or behind the Moon (second half of tithi). When Moon is exactly on it, karaṇa is changing.
+    const tithiStartElong = Math.floor(arcSpan / 12) * 12;
+    const karanaBoundaryElong = tithiStartElong + 6;
+    let karanaNotch = null;
+    // Only plot if karaṇa boundary lies within the arc range that contains useful information.
+    // Skip very small arcs (right after new moon) where the boundary would be too close to Sun.
+    if (karanaBoundaryElong > 0 && karanaBoundaryElong < 360 && arcSpan > 0.5) {
+      const l = (sunTrop + karanaBoundaryElong) % 360;
+      const eq2 = eclToEq(l, 0, eps);
+      const hor = eqToHor(eq2.ra, eq2.dec, lat, lst);
+      karanaNotch = projectStereographic(hor.alt, hor.az);
+    }
+
     return {
       jd, ayan, eps, lst, gmst,
       planets, nodes, ascSid, ascTrop, ascProj,
       ecliptic, nakStars, otherStars,
       rashiBounds, nakBounds, padaBounds,
+      panchanga, tithiArc, karanaNotch,
     };
   }, [now, lat, lon]);
 
@@ -337,6 +565,33 @@ export default function Ayanamsha() {
   const cx = size / 2, cy = size / 2;
   const toPx = p => ({ x: cx + p.x * R, y: cy + p.y * R });
 
+  // Label sizing: a multiplier applied to all SVG text font sizes.
+  // Small=current behaviour, Medium=1.4x (default), Large=1.8x.
+  const labelScale = labelSize === 'small' ? 1.0 : labelSize === 'large' ? 1.8 : 1.4;
+  // Helper: scaled font size string
+  const fs = (px) => `${(px * labelScale).toFixed(1)}`;
+
+  // Trail tracking: each render, push the current sky-coords of every planet (and Lagna)
+  // into a rolling buffer. Cap the trail length and prune old entries.
+  // Trails make most sense at higher animation speeds where motion is visible.
+  const TRAIL_LENGTH = 80;
+  useEffect(() => {
+    if (!showTrails) {
+      trailsRef.current = {};
+      return;
+    }
+    const trails = trailsRef.current;
+    function push(key, point) {
+      if (!point) return;
+      if (!trails[key]) trails[key] = [];
+      trails[key].push({ x: point.x, y: point.y });
+      if (trails[key].length > TRAIL_LENGTH) trails[key].shift();
+    }
+    for (const pl of sky.planets) push(pl.key, pl.p);
+    for (const nd of sky.nodes) push(nd.key, nd.p);
+    push('Lagna', sky.ascProj.p);
+  }, [now, showTrails, lat, lon]);
+
   const eclipticSegments = useMemo(() => {
     const segs = [];
     let cur = [];
@@ -358,10 +613,108 @@ export default function Ayanamsha() {
   }
 
   function shiftTime(hours) {
-    setLive(false);
+    setPlaying(false);
     setNow(new Date(now.getTime() + hours * 3600 * 1000));
   }
-  function reset() { setLive(true); setNow(new Date()); }
+  function reset() {
+    setSpeedMultiplier(1);
+    setPlaying(true);
+    setNow(new Date());
+  }
+
+  // Animation speed presets. Each value = simulated seconds per real second.
+  // 1 = live. 60 = "1 min/sec". 720 = slow sky rotation. 1440 = Lagna sweep.
+  // 10000 = Moon drifting through nakṣatras.
+  const SPEED_PRESETS = [
+    { label: '1×', value: 1, title: 'Live (real-time)' },
+    { label: '60×', value: 60, title: '1 minute per second' },
+    { label: '720×', value: 720, title: 'Slow sky rotation' },
+    { label: '1440×', value: 1440, title: 'Lagna sweep: 1 day per minute' },
+    { label: '10k×', value: 10000, title: 'Moon drifts through nakṣatras' },
+  ];
+
+  function setSpeed(mult) {
+    setSpeedMultiplier(mult);
+    setPlaying(true);
+    // Reset trails when speed changes - they look weird otherwise
+    trailsRef.current = {};
+  }
+
+  // ---- Location helpers ----
+
+  // Use the browser's geolocation API to get the user's actual lat/lon.
+  // Requires user permission. Falls back gracefully if denied or unavailable.
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setSearchError('Geolocation not supported by this browser');
+      return;
+    }
+    setSearchError(null);
+    setSearching(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(pos.coords.latitude);
+        setLon(pos.coords.longitude);
+        setLocName('My location');
+        setSearchResults([]);
+        setSearchQuery('');
+        setSearching(false);
+      },
+      (err) => {
+        setSearching(false);
+        setSearchError(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission denied'
+            : 'Could not get location'
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
+    );
+  }
+
+  // Debounced city search using Open-Meteo's free geocoding API.
+  // No API key required. Returns up to 5 results matching the query.
+  // Open-Meteo has nicer disambiguation than Nominatim for cities specifically.
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+    setSearching(true);
+    setSearchError(null);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery.trim())}&count=5&language=en&format=json`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Search failed');
+        const data = await res.json();
+        setSearchResults(data.results || []);
+        setSearching(false);
+      } catch (e) {
+        setSearchError('Search failed — check connection');
+        setSearchResults([]);
+        setSearching(false);
+      }
+    }, 350);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchQuery]);
+
+  function pickResult(r) {
+    setLat(r.latitude);
+    setLon(r.longitude);
+    // Display name: "Hyderabad, Telangana, IN"
+    const parts = [r.name];
+    if (r.admin1 && r.admin1 !== r.name) parts.push(r.admin1);
+    if (r.country_code) parts.push(r.country_code);
+    setLocName(parts.join(', '));
+    setSearchResults([]);
+    setSearchQuery('');
+    setSearchError(null);
+  }
 
   const PRESETS = [
     { name: 'Brisbane', lat: -27.4698, lon: 153.0251 },
@@ -391,7 +744,7 @@ export default function Ayanamsha() {
             textTransform: 'uppercase', marginBottom: 4 }}>Khagola Darśana</div>
           <h1 style={{ fontSize: 32, fontWeight: 400, margin: 0, letterSpacing: '0.02em',
             fontFamily: '"Cormorant SC", "Cormorant Garamond", serif', color: '#f0e4c2' }}>
-            Ayanamsha</h1>
+            Vedic Sky Map</h1>
           <div style={{ fontSize: 11, color: '#8a7a5a', marginTop: 4, letterSpacing: '0.1em' }}>
             astronomy-engine (~1 arcmin) · Lahiri ayanāṃśa · sidereal · stereographic
           </div>
@@ -420,10 +773,10 @@ export default function Ayanamsha() {
                   fill="none" stroke="rgba(184, 149, 106, 0.15)" strokeWidth="0.5" strokeDasharray="2 4" />
               ))}
 
-              <text x={northPt.x} y={northPt.y - 8} textAnchor="middle" fill="#b8956a" fontSize="11" letterSpacing="0.15em">N</text>
-              <text x={southPt.x} y={southPt.y + 18} textAnchor="middle" fill="#b8956a" fontSize="11" letterSpacing="0.15em">S</text>
-              <text x={eastPt.x - 10} y={eastPt.y + 4} textAnchor="end" fill="#d4a850" fontSize="12" letterSpacing="0.15em" fontWeight="500">E</text>
-              <text x={westPt.x + 10} y={westPt.y + 4} textAnchor="start" fill="#b8956a" fontSize="11" letterSpacing="0.15em">W</text>
+              <text x={northPt.x} y={northPt.y - 8} textAnchor="middle" fill="#b8956a" fontSize={fs(11)} letterSpacing="0.15em">N</text>
+              <text x={southPt.x} y={southPt.y + 18} textAnchor="middle" fill="#b8956a" fontSize={fs(11)} letterSpacing="0.15em">S</text>
+              <text x={eastPt.x - 10} y={eastPt.y + 4} textAnchor="end" fill="#d4a850" fontSize={fs(12)} letterSpacing="0.15em" fontWeight="500">E</text>
+              <text x={westPt.x + 10} y={westPt.y + 4} textAnchor="start" fill="#b8956a" fontSize={fs(11)} letterSpacing="0.15em">W</text>
 
               {eclipticSegments.map((d, i) => (
                 <path key={i} d={d} fill="none" stroke="#5a8aff" strokeWidth="1" strokeOpacity="0.6" strokeDasharray="3 2" />
@@ -442,7 +795,7 @@ export default function Ayanamsha() {
                   <g key={`nb${i}`}>
                     <circle cx={pt.x} cy={pt.y} r={2.2} fill="#a3c0ff" stroke="#1a2540" strokeWidth="0.8" />
                     {showLabels && (
-                      <text x={pt.x + 4} y={pt.y + 10} fill="#a3c0ff" fontSize="8"
+                      <text x={pt.x + 4} y={pt.y + 10} fill="#a3c0ff" fontSize={fs(8)}
                         opacity="0.75" letterSpacing="0.02em">{nb.nak.name.slice(0, 4)}</text>
                     )}
                   </g>
@@ -456,7 +809,7 @@ export default function Ayanamsha() {
                   <g key={`r${i}`}>
                     <circle cx={pt.x} cy={pt.y} r={3.5} fill="#d4a850" stroke="#2a1f0a" strokeWidth="1" />
                     {showLabels && (
-                      <text x={pt.x + 6} y={pt.y - 4} fill="#d4a850" fontSize="10"
+                      <text x={pt.x + 6} y={pt.y - 4} fill="#d4a850" fontSize={fs(10)}
                         fontStyle="italic" letterSpacing="0.05em">{r.rashi.name}</text>
                     )}
                   </g>
@@ -473,7 +826,7 @@ export default function Ayanamsha() {
                     <circle cx={pt.x} cy={pt.y} r={r + 2} fill="#f5d870" opacity="0.15" />
                     <circle cx={pt.x} cy={pt.y} r={r} fill="#f5e8b0" filter="url(#starGlow)" />
                     {showLabels && (
-                      <text x={pt.x + r + 3} y={pt.y + 3} fill="#f5e8b0" fontSize="9"
+                      <text x={pt.x + r + 3} y={pt.y + 3} fill="#f5e8b0" fontSize={fs(9)}
                         opacity="0.85" letterSpacing="0.03em">{s.name}</text>
                     )}
                   </g>
@@ -489,12 +842,89 @@ export default function Ayanamsha() {
                     onClick={() => setSelected({ type: 'star', data: s })}>
                     <circle cx={pt.x} cy={pt.y} r={r} fill="#cfd6e8" filter="url(#starGlow)" />
                     {showLabels && (
-                      <text x={pt.x + r + 3} y={pt.y + 3} fill="#a8b0c0" fontSize="8"
+                      <text x={pt.x + r + 3} y={pt.y + 3} fill="#a8b0c0" fontSize={fs(8)}
                         opacity="0.7" letterSpacing="0.02em">{s.name.split(' (')[0]}</text>
                     )}
                   </g>
                 );
               })}
+
+              {/* Tithi arc: glowing arc from Sun to Moon along the ecliptic.
+                  Colour-coded by pakṣa (gold for śukla, silver for kṛṣṇa).
+                  Length grows from 0° (Amāvāsyā) to 360° back to 0°. */}
+              {showTithiArc && sky.tithiArc.length > 1 && (() => {
+                const isShukla = sky.panchanga.tithi.paksha === 'Śukla';
+                const arcColor = isShukla ? '#f5d870' : '#a8b0c0';
+                const pathParts = [];
+                let pathOpen = false;
+                for (const pt of sky.tithiArc) {
+                  if (pt.p) {
+                    const px = toPx(pt.p);
+                    if (!pathOpen) {
+                      pathParts.push(`M ${px.x.toFixed(1)} ${px.y.toFixed(1)}`);
+                      pathOpen = true;
+                    } else {
+                      pathParts.push(`L ${px.x.toFixed(1)} ${px.y.toFixed(1)}`);
+                    }
+                  } else {
+                    pathOpen = false; // gap when arc passes below horizon
+                  }
+                }
+                const d = pathParts.join(' ');
+                return (
+                  <g>
+                    {/* Glow halo */}
+                    <path d={d} fill="none" stroke={arcColor} strokeWidth="6"
+                      strokeOpacity="0.12" strokeLinecap="round" />
+                    {/* Main arc */}
+                    <path d={d} fill="none" stroke={arcColor} strokeWidth="2.2"
+                      strokeOpacity="0.7" strokeLinecap="round" />
+                  </g>
+                );
+              })()}
+
+              {/* Karaṇa marker: Devanagari क (ka) at the half-tithi boundary on the ecliptic.
+                  Visually distinct from any planet glyph. */}
+              {showTithiArc && sky.karanaNotch && (() => {
+                const pt = toPx(sky.karanaNotch);
+                return (
+                  <g>
+                    {/* Faint backing for legibility against bright stars / ecliptic */}
+                    <circle cx={pt.x} cy={pt.y} r={9} fill="#1a1408" opacity="0.55" />
+                    {/* Devanagari ka character */}
+                    <text x={pt.x} y={pt.y + 5} textAnchor="middle"
+                      fill="#f5d870" fontSize={fs(15)} fontWeight="500"
+                      style={{ fontFamily: 'serif' }}>क</text>
+                  </g>
+                );
+              })()}
+
+              {/* Trails: rendered before planets/Lagna so they sit visually behind */}
+              {showTrails && (() => {
+                const trailColors = {
+                  Sun: '#f5c542', Moon: '#e8e8e8', Mercury: '#9bc6e0',
+                  Venus: '#fce0a0', Mars: '#e07050', Jupiter: '#e8b870',
+                  Saturn: '#7a8090', Rahu: '#7a5cff', Ketu: '#a07a4f',
+                  Lagna: '#ff6b3d',
+                };
+                const out = [];
+                for (const [key, points] of Object.entries(trailsRef.current)) {
+                  if (!points || points.length < 2) continue;
+                  const color = trailColors[key] || '#888';
+                  for (let i = 1; i < points.length; i++) {
+                    const a = toPx(points[i - 1]);
+                    const b = toPx(points[i]);
+                    const opacity = (i / points.length) * 0.6;
+                    out.push(
+                      <line key={`tr-${key}-${i}`}
+                        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                        stroke={color} strokeWidth={1.2} strokeOpacity={opacity}
+                        strokeLinecap="round" />
+                    );
+                  }
+                }
+                return out;
+              })()}
 
               {sky.ascProj.p && (() => {
                 const pt = toPx(sky.ascProj.p);
@@ -502,7 +932,7 @@ export default function Ayanamsha() {
                   <g style={{ cursor: 'pointer' }} onClick={() => setSelected({ type: 'lagna' })}>
                     <circle cx={pt.x} cy={pt.y} r={10} fill="none" stroke="#ff6b3d" strokeWidth="1.5" />
                     <circle cx={pt.x} cy={pt.y} r={4} fill="#ff6b3d" />
-                    <text x={pt.x + 14} y={pt.y + 4} fill="#ff6b3d" fontSize="12"
+                    <text x={pt.x + 14} y={pt.y + 4} fill="#ff6b3d" fontSize={fs(12)}
                       fontWeight="600" letterSpacing="0.1em">LAGNA</text>
                   </g>
                 );
@@ -511,14 +941,20 @@ export default function Ayanamsha() {
               {sky.planets.map((pl, i) => {
                 if (!pl.p) return null;
                 const pt = toPx(pl.p);
+                // Sun is rendered 1.5× larger than the other grahas to reflect its visual
+                // dominance and prevent confusion with smaller planets like Mercury and Venus.
+                const sizeMult = pl.key === 'Sun' ? 1.5 : 1;
+                const haloR = 9 * sizeMult;
+                const discR = 5 * sizeMult;
+                const labelOffset = 9 * sizeMult;
                 return (
                   <g key={i} style={{ cursor: 'pointer' }}
                     onClick={() => setSelected({ type: 'planet', data: pl })}>
-                    <circle cx={pt.x} cy={pt.y} r={9} fill={pl.color} opacity="0.25" />
-                    <circle cx={pt.x} cy={pt.y} r={5} fill={pl.color} stroke="#1a1408" strokeWidth="1" />
-                    <text x={pt.x + 9} y={pt.y + 4} fill={pl.color} fontSize="13" fontWeight="600">{pl.label}</text>
+                    <circle cx={pt.x} cy={pt.y} r={haloR} fill={pl.color} opacity="0.25" />
+                    <circle cx={pt.x} cy={pt.y} r={discR} fill={pl.color} stroke="#1a1408" strokeWidth="1" />
+                    <text x={pt.x + labelOffset} y={pt.y + 4} fill={pl.color} fontSize={fs(13)} fontWeight="600">{pl.label}</text>
                     {pl.retrograde && (
-                      <text x={pt.x + 9} y={pt.y + 16} fill={pl.color} fontSize="9"
+                      <text x={pt.x + labelOffset} y={pt.y + 16} fill={pl.color} fontSize={fs(9)}
                         opacity="0.85" fontStyle="italic">℞</text>
                     )}
                   </g>
@@ -533,7 +969,7 @@ export default function Ayanamsha() {
                     onClick={() => setSelected({ type: 'planet', data: nd })}>
                     <circle cx={pt.x} cy={pt.y} r={9} fill={nd.color} opacity="0.25" />
                     <circle cx={pt.x} cy={pt.y} r={5} fill={nd.color} stroke="#1a1408" strokeWidth="1" />
-                    <text x={pt.x + 9} y={pt.y + 4} fill={nd.color} fontSize="13" fontWeight="600">{nd.label}</text>
+                    <text x={pt.x + 9} y={pt.y + 4} fill={nd.color} fontSize={fs(13)} fontWeight="600">{nd.label}</text>
                   </g>
                 );
               })}
@@ -545,10 +981,34 @@ export default function Ayanamsha() {
               <div style={{ fontSize: 13, color: '#f0e4c2', marginBottom: 8, fontVariantNumeric: 'tabular-nums' }}>
                 {now.toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'medium' })}
               </div>
+
+              {/* Play / pause / now */}
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                <Btn onClick={() => setPlaying(p => !p)} primary>
+                  {playing ? '⏸ Pause' : '▶ Play'}
+                </Btn>
+                <Btn onClick={reset}>● Now</Btn>
+                <Btn onClick={() => setShowTrails(t => !t)} active={showTrails}>
+                  Trails
+                </Btn>
+              </div>
+
+              {/* Speed presets */}
+              <div style={{ fontSize: 9, color: '#8a7a5a', letterSpacing: '0.15em',
+                textTransform: 'uppercase', marginTop: 6, marginBottom: 4 }}>Speed</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {SPEED_PRESETS.map(s => (
+                  <Btn key={s.value} onClick={() => setSpeed(s.value)}
+                    active={speedMultiplier === s.value}>{s.label}</Btn>
+                ))}
+              </div>
+
+              {/* Manual step (only useful when paused) */}
+              <div style={{ fontSize: 9, color: '#8a7a5a', letterSpacing: '0.15em',
+                textTransform: 'uppercase', marginTop: 10, marginBottom: 4 }}>Step</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <Btn onClick={() => shiftTime(-1)}>−1h</Btn>
                 <Btn onClick={() => shiftTime(-1/6)}>−10m</Btn>
-                <Btn onClick={reset} primary>{live ? '● Live' : 'Now'}</Btn>
                 <Btn onClick={() => shiftTime(1/6)}>+10m</Btn>
                 <Btn onClick={() => shiftTime(1)}>+1h</Btn>
               </div>
@@ -566,6 +1026,77 @@ export default function Ayanamsha() {
               <div style={{ fontSize: 13, color: '#f0e4c2', marginBottom: 8 }}>
                 {locName} · {lat.toFixed(2)}°, {lon.toFixed(2)}°
               </div>
+
+              {/* Search box + "use my location" */}
+              <div style={{ position: 'relative', marginBottom: 8 }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search city…"
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    background: 'rgba(184, 149, 106, 0.08)',
+                    border: '1px solid rgba(184, 149, 106, 0.3)',
+                    borderRadius: 4,
+                    color: '#e8e0c8',
+                    fontFamily: 'inherit',
+                    fontSize: 13,
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+                {searchResults.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: 2,
+                    background: 'rgba(20, 14, 8, 0.97)',
+                    border: '1px solid rgba(184, 149, 106, 0.4)',
+                    borderRadius: 4,
+                    zIndex: 10,
+                    maxHeight: 200,
+                    overflowY: 'auto',
+                  }}>
+                    {searchResults.map((r, i) => (
+                      <div key={i} onClick={() => pickResult(r)} style={{
+                        padding: '6px 8px',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        borderBottom: i < searchResults.length - 1 ? '1px solid rgba(184, 149, 106, 0.1)' : 'none',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(212, 168, 80, 0.15)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <div style={{ color: '#f0e4c2' }}>
+                          {r.name}{r.admin1 && r.admin1 !== r.name ? `, ${r.admin1}` : ''}{r.country_code ? `, ${r.country_code}` : ''}
+                        </div>
+                        <div style={{ color: '#8a7a5a', fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
+                          {r.latitude.toFixed(2)}°, {r.longitude.toFixed(2)}°
+                          {r.population ? ` · pop. ${(r.population/1000).toFixed(0)}k` : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {searching && (
+                <div style={{ fontSize: 10, color: '#8a7a5a', marginBottom: 6 }}>Searching…</div>
+              )}
+              {searchError && (
+                <div style={{ fontSize: 10, color: '#e07050', marginBottom: 6 }}>{searchError}</div>
+              )}
+
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                <Btn onClick={useMyLocation}>📍 My location</Btn>
+              </div>
+
+              <div style={{ fontSize: 9, color: '#8a7a5a', letterSpacing: '0.15em',
+                textTransform: 'uppercase', marginTop: 6, marginBottom: 4 }}>Favourites</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {PRESETS.map(p => (
                   <Btn key={p.name} onClick={() => { setLat(p.lat); setLon(p.lon); setLocName(p.name); }}
@@ -580,7 +1111,16 @@ export default function Ayanamsha() {
               <Toggle on={showPada} onChange={setShowPada} label="Pāda ticks" />
               <Toggle on={showNakshatra} onChange={setShowNakshatra} label="Nakṣatra stars" />
               <Toggle on={showStars} onChange={setShowStars} label="Named stars" />
+              <Toggle on={showTithiArc} onChange={setShowTithiArc} label="Tithi arc" />
               <Toggle on={showLabels} onChange={setShowLabels} label="Labels" />
+
+              <div style={{ fontSize: 9, color: '#8a7a5a', letterSpacing: '0.15em',
+                textTransform: 'uppercase', marginTop: 10, marginBottom: 4 }}>Label size</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <Btn onClick={() => setLabelSize('small')} active={labelSize === 'small'}>Small</Btn>
+                <Btn onClick={() => setLabelSize('medium')} active={labelSize === 'medium'}>Medium</Btn>
+                <Btn onClick={() => setLabelSize('large')} active={labelSize === 'large'}>Large</Btn>
+              </div>
             </Panel>
 
             {selected && <SelectedInfo selected={selected} sky={sky}
@@ -604,6 +1144,52 @@ export default function Ayanamsha() {
             })()} />
           ))}
           <InfoCell label="Ayanāṃśa" color="#b8956a" value={fmtDeg(sky.ayan) + ' (Lahiri)'} />
+        </div>
+
+        {/* Pañcāṅga status panel - the five limbs of the traditional calendar */}
+        <div style={{ marginTop: 12, padding: 12, background: 'rgba(20, 14, 8, 0.55)',
+          border: '1px solid rgba(245, 216, 112, 0.25)', borderRadius: 8 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.25em', color: '#d4a850',
+            textTransform: 'uppercase', marginBottom: 10, textAlign: 'center' }}>
+            Pañcāṅga
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 12, fontSize: 12,
+          }}>
+            <PanchangaCell label="Tithi"
+              primary={`${sky.panchanga.tithi.name} (${sky.panchanga.tithi.number})`}
+              secondary={`${sky.panchanga.tithi.paksha} pakṣa`}
+              tertiary={`${(sky.panchanga.tithi.progress * 100).toFixed(0)}% complete`}
+              color={sky.panchanga.tithi.paksha === 'Śukla' ? '#f5d870' : '#a8b0c0'} />
+            <PanchangaCell label="Yoga"
+              primary={`${sky.panchanga.yoga.name} (${sky.panchanga.yoga.number})`}
+              secondary={`${YOGA_QUALITY[sky.panchanga.yoga.name] || ''}`}
+              color="#9bc6e0" />
+            <PanchangaCell label="Karaṇa"
+              primary={`${sky.panchanga.karana.name} (${sky.panchanga.karana.position})`}
+              secondary={sky.panchanga.karana.name === 'Viṣṭi' ? 'aka Bhadrā (avoid)' :
+                FIXED_KARANAS[sky.panchanga.karana.position] ? 'sthira (fixed)' : 'cara (movable)'}
+              tertiary={sky.panchanga.karana.half === 0 ? 'first half of tithi' : 'second half of tithi'}
+              color="#fce0a0" />
+            <PanchangaCell label="Vāra"
+              primary={sky.panchanga.vara.name}
+              secondary={`day of ${sky.panchanga.vara.planet}`}
+              color="#e8b870" />
+            <PanchangaCell label="Nakṣatra (Moon)"
+              primary={(() => {
+                const moon = sky.planets.find(p => p.key === 'Moon');
+                const n = nakshatraOf(moon.sidLon);
+                return `${n.nak.name} (${n.nak.n}), pāda ${n.pada}`;
+              })()}
+              secondary={(() => {
+                const moon = sky.planets.find(p => p.key === 'Moon');
+                const n = nakshatraOf(moon.sidLon);
+                return `lord: ${n.nak.lord}`;
+              })()}
+              color="#e8e8e8" />
+          </div>
         </div>
 
         <div style={{ marginTop: 12, fontSize: 10, color: '#5a5040', textAlign: 'center', letterSpacing: '0.05em' }}>
@@ -659,6 +1245,22 @@ function InfoCell({ label, value, color }) {
       <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#8a7a5a',
         textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
       <div style={{ color, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+    </div>
+  );
+}
+
+function PanchangaCell({ label, primary, secondary, tertiary, color }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#8a7a5a',
+        textTransform: 'uppercase', marginBottom: 3 }}>{label}</div>
+      <div style={{ color, fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{primary}</div>
+      {secondary && (
+        <div style={{ color: '#a09080', fontSize: 10, fontStyle: 'italic' }}>{secondary}</div>
+      )}
+      {tertiary && (
+        <div style={{ color: '#705f48', fontSize: 9 }}>{tertiary}</div>
+      )}
     </div>
   );
 }
